@@ -693,7 +693,7 @@ describe("plan_exit detection", () => {
       expect(text).toContain("Use the plan path specified by the user or project instructions")
       expect(text).toContain("Use the chosen plan path as the main plan file")
       expect(text).toContain("Project/user instructions about plan location")
-      expect(text).toContain("Before creating or updating the plan file")
+      expect(text).toContain("Before writing the final plan")
       expect(text).toContain("Finalize and save the plan")
       expect(text).toContain("Continue refining")
       expect(text).toContain(".plans/")

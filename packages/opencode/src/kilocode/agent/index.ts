@@ -9,6 +9,7 @@ import { makeRuntime } from "@/effect/run-service"
 import { Schema } from "effect"
 import path from "path"
 import { Global } from "@opencode-ai/core/global"
+import { Planning } from "@/kilocode/planning"
 
 import PROMPT_DEBUG from "../../agent/prompt/debug.txt"
 import PROMPT_ORCHESTRATOR from "../../agent/prompt/orchestrator.txt"
@@ -160,6 +161,11 @@ function denies(user: Permission.Ruleset) {
   return user.filter((rule) => rule.action === "deny")
 }
 
+function editDenies(user: Permission.Ruleset) {
+  // Wildcard edit denies are intentionally skipped so the plan-file allowlist can stay usable.
+  return user.filter((rule) => rule.action === "deny" && rule.permission === "edit" && rule.pattern !== "*")
+}
+
 function askEditGuard() {
   return Permission.fromConfig({ edit: "deny" })
 }
@@ -179,6 +185,36 @@ function planEditRules(worktree: string) {
 
 function planEditGuard(worktree: string) {
   return Permission.fromConfig({ edit: planEditRules(worktree) })
+}
+
+function denied(rule: unknown) {
+  if (rule === "deny") return true
+  if (!rule || typeof rule !== "object" || Array.isArray(rule)) return false
+  return Object.values(rule).includes("deny")
+}
+
+export function patchPlanningAgents(
+  agents: Record<
+    string,
+    {
+      name: string
+      options?: Record<string, unknown>
+      permission: Permission.Ruleset
+    }
+  >,
+  cfg: Record<string, { permission?: Record<string, unknown> | undefined }>,
+  worktree: string,
+) {
+  for (const [key, agent] of Object.entries(agents)) {
+    if (!Planning.agent(agent)) continue
+    const exit = denied(cfg[key]?.permission?.plan_exit)
+    agent.permission = Permission.merge(
+      agent.permission,
+      ...(exit ? [] : [Permission.fromConfig({ plan_exit: "allow" })]),
+      planEditGuard(worktree),
+      editDenies(agent.permission),
+    )
+  }
 }
 
 function planGuard(worktree: string, mcp: Record<string, "allow" | "ask" | "deny"> = {}) {

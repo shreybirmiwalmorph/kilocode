@@ -327,6 +327,7 @@ export const layer = Layer.effect(
           item.permission = Permission.merge(item.permission, Permission.fromConfig(value.permission ?? {}))
           KiloAgent.processConfigItem(item) // kilocode_change - populate displayName from options
         }
+        KiloAgent.patchPlanningAgents(agents, agentConfigs, ctx.worktree) // kilocode_change - keep plan-like custom agents able to save plans
 
         function referencePrompt(reference: Reference.Resolved) {
           if (reference.kind === "local") {

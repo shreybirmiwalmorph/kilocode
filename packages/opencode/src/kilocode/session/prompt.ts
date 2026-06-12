@@ -20,24 +20,13 @@ import { environmentDetails, type EditorContext } from "@/kilocode/editor-contex
 import { Identifier } from "@/id/id"
 import { Filesystem } from "@/util/filesystem"
 import { InstanceState } from "@/effect/instance-state"
+import { Planning } from "@/kilocode/planning"
 import NATIVE_PLAN_PROMPT from "@/kilocode/session/native-plan-prompt.txt"
 import CODE_SWITCH from "@/session/prompt/code-switch.txt"
 
 export namespace KiloSessionPrompt {
-  const modes = ["ask", "plan", "architect"]
-
   export function titleID(sessionID: SessionID) {
     return `title-${sessionID}`
-  }
-
-  function mode(name: string) {
-    return name.toLowerCase()
-  }
-
-  function planning(input: { name: string; options?: Record<string, unknown> }) {
-    const id = typeof input.options?.id === "string" ? mode(input.options.id) : undefined
-    const name = mode(input.name)
-    return id === "architect" || name === "plan" || name === "architect"
   }
 
   /**
@@ -134,20 +123,25 @@ export namespace KiloSessionPrompt {
   )
 
   export function guardPermissions(input: {
-    agent: { name: string; permission: Permission.Ruleset }
+    agent: { name: string; options?: Record<string, unknown>; permission: Permission.Ruleset }
     session: Pick<Session.Info, "permission">
   }) {
     const rules = input.session.permission ?? []
-    if (!modes.includes(mode(input.agent.name))) return rules
+    if (!Planning.guarded(input.agent)) return rules
+    const denies = Planning.agent(input.agent)
+      ? rules.filter((rule) => rule.action === "deny" && !(rule.permission === "edit" && rule.pattern === "*"))
+      : rules.filter((rule) => rule.action === "deny")
     return Permission.merge(
       rules,
       input.agent.permission,
-      rules.filter((rule) => rule.action === "deny"),
+      denies,
     )
   }
 
-  export function hardPermissions(input: { agent: { name: string; permission: Permission.Ruleset } }) {
-    if (!modes.includes(mode(input.agent.name))) return
+  export function hardPermissions(input: {
+    agent: { name: string; options?: Record<string, unknown>; permission: Permission.Ruleset }
+  }) {
+    if (!Planning.guarded(input.agent)) return
     return input.agent.permission
   }
 
@@ -267,7 +261,7 @@ export namespace KiloSessionPrompt {
     userMessage: MessageV2.WithParts
     messages?: MessageV2.WithParts[]
   }) {
-    if (!planning(input.agent)) return
+    if (!Planning.agent(input.agent)) return
     const add = (text: string) =>
       input.userMessage.parts.push({
         id: PartID.ascending(),
@@ -282,7 +276,7 @@ export namespace KiloSessionPrompt {
     const ctx = InstanceState.bind(() => Instance.current)()
     const plan = Session.plan(input.session, ctx)
 
-    if (mode(input.agent.name) === "plan") add(NATIVE_PLAN_PROMPT)
+    if (Planning.mode(input.agent.name) === "plan") add(NATIVE_PLAN_PROMPT)
 
     const file = input.messages ? PlanFile.latest(input.messages) : undefined
     const saved = PlanFile.resolve(file, ctx)
@@ -298,7 +292,7 @@ export namespace KiloSessionPrompt {
       info,
       "Use the chosen plan path as the main plan file. Do not write or edit other files unless the user explicitly asks and your permissions allow it.",
       "Project/user instructions about plan location (for example .plans/) are authorized when permissions allow them; they do not conflict with this reminder. When finalizing, call plan_exit with the path of the plan file you wrote.",
-      'Before creating or updating the plan file, or calling plan_exit, ask the user to choose exactly one of: "Finalize and save the plan" or "Continue refining". If the user chooses to finalize, write the main plan file, then call plan_exit.',
+      'Before writing the final plan or calling plan_exit, ask the user to choose exactly one of: "Finalize and save the plan" or "Continue refining". If the user chooses to finalize, write the main plan file, then call plan_exit.',
     ].join("\n")
     add(`<system-reminder>\n${body}\n</system-reminder>`)
   }

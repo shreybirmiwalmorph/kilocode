@@ -2,6 +2,7 @@ import path from "path"
 import os from "os"
 import fs from "fs/promises"
 import { KiloSessionPrompt } from "@/kilocode/session/prompt" // kilocode_change
+import { PlanFile } from "@/kilocode/plan-file" // kilocode_change
 import { KiloSessionMessageOrder } from "@/kilocode/session/message-order" // kilocode_change
 import { KiloSessionPromptQueue } from "@/kilocode/session/prompt-queue" // kilocode_change
 import { KiloSession } from "@/kilocode/session" // kilocode_change
@@ -410,9 +411,8 @@ export const layer = Layer.effect(
       const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
       if (!userMessage) return input.messages
 
-      // kilocode_change start - centralize plan/architect reminders across plan-mode implementations
-      // Run before the experimentalPlanMode fork so native plan and architect share one
-      // reminder source in both implementations. The helper is a no-op for non-planning agents.
+      // kilocode_change start - one planning reminder path for both flag branches
+      // No-op unless the active agent is plan-like.
       yield* Effect.promise(() =>
         KiloSessionPrompt.insertPlanReminders({
           agent: input.agent,
@@ -442,7 +442,7 @@ export const layer = Layer.effect(
       const assistantMessage = input.messages.findLast((msg) => msg.info.role === "assistant")
       if (input.agent.name !== "plan" && assistantMessage?.info.agent === "plan") {
         const ctx = yield* InstanceState.context
-        const plan = Session.plan(input.session, ctx)
+        const plan = PlanFile.resolve(PlanFile.latest(input.messages), ctx) ?? Session.plan(input.session, ctx) // kilocode_change
         if (!(yield* fsys.existsSafe(plan))) return input.messages
         const part = yield* sessions.updatePart({
           id: PartID.ascending(),
