@@ -2,7 +2,7 @@
   display: grid;
   grid-template-columns:
     13.75rem minmax(24rem, 1fr)
-    clamp(250px, var(--project-info-width, 300px), min(800px, calc(100vw - 37.75rem)));
+    clamp(250px, var(--project-info-width, 300px), var(--project-info-max, min(800px, calc(100vw - 37.75rem))));
   height: 100%;
   min-height: 0;
   overflow: hidden;
@@ -375,6 +375,14 @@
   opacity: 1;
   pointer-events: auto;
   visibility: visible;
+}
+
+.kilo-console .project-terminal-loading {
+  display: grid;
+  flex: 1 1 auto;
+  place-items: center;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
 }
 
 .kilo-console .project-terminal {

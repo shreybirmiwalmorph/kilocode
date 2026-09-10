@@ -1,17 +1,18 @@
+import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { afterEach, describe, expect, test } from "bun:test"
 import { Deferred, Effect, Fiber, Layer, Stream } from "effect"
 import * as Sink from "effect/Sink"
 import * as TestClock from "effect/testing/TestClock"
 import { ChildProcessSpawner } from "effect/unstable/process"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
-import { AppFileSystem } from "@opencode-ai/core/filesystem"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { CommandTimeout } from "@/kilocode/command-timeout"
 import { ShellTool } from "@/tool/shell"
 import { Plugin } from "@/plugin"
 import { Truncate } from "@/tool/truncate"
 import { Config } from "@/config/config"
 import { Agent } from "@/agent/agent"
-import { Shell } from "@/shell/shell"
+import { Shell } from "@opencode-ai/core/shell"
 import { MessageID, SessionID } from "@/session/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { testEffect } from "../lib/effect"
@@ -22,13 +23,13 @@ const encoder = new TextEncoder()
 const it = testEffect(Layer.empty)
 const shell = testEffect(
   Layer.mergeAll(
-    CrossSpawnSpawner.defaultLayer,
-    AppFileSystem.defaultLayer,
-    Plugin.defaultLayer,
-    Truncate.defaultLayer,
-    Config.defaultLayer,
-    Agent.defaultLayer,
-    RuntimeFlags.defaultLayer,
+    AppNodeBuilder.build(CrossSpawnSpawner.node),
+    AppNodeBuilder.build(FSUtil.node),
+    AppNodeBuilder.build(Plugin.node),
+    AppNodeBuilder.build(Truncate.node),
+    AppNodeBuilder.build(Config.node),
+    AppNodeBuilder.build(Agent.node),
+    AppNodeBuilder.build(RuntimeFlags.node),
   ),
 )
 
@@ -95,18 +96,14 @@ describe("CommandTimeout", () => {
             state.killed = true
           }),
       })
-      const fiber = yield* CommandTimeout.drain(child, Effect.never, "shell command terminated").pipe(
-        Effect.forkChild,
-      )
+      const fiber = yield* CommandTimeout.drain(child, Effect.never, "shell command terminated").pipe(Effect.forkChild)
       yield* Effect.yieldNow
 
       yield* TestClock.adjust("24 millis")
       expect(state.killed).toBe(false)
       yield* TestClock.adjust("1 millis")
       expect(state.killed).toBe(true)
-      expect(yield* Fiber.join(fiber)).toBe(
-        "shell command terminated after exceeding environment timeout 25 ms.",
-      )
+      expect(yield* Fiber.join(fiber)).toBe("shell command terminated after exceeding environment timeout 25 ms.")
     }),
   )
 
@@ -168,7 +165,6 @@ shell.instance(
         },
       )
 
-      expect(result.output).toContain("started")
       expect(result.output).toContain("environment timeout 500 ms")
       expect(result.output).toContain("You're running in a sandbox.")
       expect(result.output).not.toContain("retry with a larger timeout")

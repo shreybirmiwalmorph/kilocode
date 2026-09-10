@@ -13,6 +13,8 @@ import { ConfigCountTag as CountTag, ConfigPage, ConfigTag as Tag, SourceBadge }
 import { ActionSelect, label as actionLabel, tone as actionTone } from "./PermissionsRoute"
 import { agentEditable, agentTitle, snippets, useAgentBuilder, type AgentEntry, type AgentItem } from "./state/agents"
 import type { PermissionAction } from "./state/permissions"
+import "../../styles/agents-tools.css"
+import "../../styles/permissions.css"
 
 type Row = { item: AgentItem; entry?: AgentEntry; rank: number }
 
@@ -265,7 +267,10 @@ export function AgentBuilderRoute() {
                       onInput={(event) => state.setDesc(event.currentTarget.value)}
                     />
                   </FieldCard>
-                  <FieldCard label="Mode">
+                  <FieldCard
+                    label="Mode"
+                    description="Primary agents can run sessions directly; subagents are delegated to by other agents."
+                  >
                     <CustomSelect
                       label="Agent mode"
                       value={state.mode()}
@@ -323,6 +328,7 @@ export function AgentBuilderRoute() {
                 <div class="ui-form agent-builder-form">
                   <FieldCard
                     label="Model"
+                    description="Leave unset to inherit the default model, or choose one to pin this agent to a specific model."
                     actions={
                       <>
                         <Show when={!state.locked() && state.model()}>
